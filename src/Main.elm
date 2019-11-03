@@ -115,7 +115,17 @@ update msg model =
             )
 
         Check id checked ->
-            ( model, Cmd.none )
+            let
+                updateEntry t =
+                    if t.id == id then
+                        { t | completed = checked }
+
+                    else
+                        t
+            in
+            ( { model | entries = List.map updateEntry model.entries }
+            , Cmd.none
+            )
 
         CheckAll state ->
             ( model, Cmd.none )
