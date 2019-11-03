@@ -3,7 +3,8 @@ port module Main exposing (..)
 import Browser
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (keyCode, on, onInput)
+import Html.Events exposing (keyCode, on, onClick, onInput)
+import Html.Keyed as Keyed
 import Json.Decode as Json
 
 
@@ -86,7 +87,11 @@ init maybeModel =
 
 type Msg
     = NoOp
+    | Add
+    | Check Int Bool
+    | CheckAll Bool
     | UpdateField String
+    | ChangeVisibility String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -95,8 +100,33 @@ update msg model =
         NoOp ->
             ( model, Cmd.none )
 
+        Add ->
+            ( { model
+                | uid = model.uid + 1
+                , field = ""
+                , entries =
+                    if String.isEmpty model.field then
+                        model.entries
+
+                    else
+                        model.entries ++ [ newEntry model.field model.uid ]
+              }
+            , Cmd.none
+            )
+
+        Check id checked ->
+            ( model, Cmd.none )
+
+        CheckAll state ->
+            ( model, Cmd.none )
+
         UpdateField field ->
             ( { model | field = field }
+            , Cmd.none
+            )
+
+        ChangeVisibility visibility ->
+            ( { model | visibility = visibility }
             , Cmd.none
             )
 
@@ -109,7 +139,7 @@ view : Model -> Html Msg
 view model =
     div
         [ class "todomvc-wrapper"
-        , style "visibility" "hidden"
+        , style "visibility" "visible"
         ]
         [ section
             [ class "todoapp" ]
@@ -117,8 +147,7 @@ view model =
             , viewEntries model.visibility model.entries
             , viewControls model.visibility model.entries
             ]
-
-        --, infoFooter
+        , infoFooter
         ]
 
 
@@ -134,8 +163,7 @@ viewInput task =
             , value task
             , name "newTodo"
             , onInput UpdateField
-
-            --, onEnter Add
+            , onEnter Add
             ]
             []
         ]
@@ -160,13 +188,163 @@ onEnter msg =
 
 viewEntries : String -> List Entry -> Html Msg
 viewEntries visibility entries =
-    div [] [ text "hello" ]
+    let
+        isVisible todo =
+            case visibility of
+                "Completed" ->
+                    todo.completed
+
+                "Active" ->
+                    not todo.completed
+
+                _ ->
+                    True
+
+        allCompleted =
+            List.all .completed entries
+
+        cssVisibility =
+            if List.isEmpty entries then
+                "hidden"
+
+            else
+                "visible"
+    in
+    section
+        [ class "main"
+        , style "visibility" cssVisibility
+        ]
+        [ input
+            [ class "toggle-all"
+            , type_ "checkbox"
+            , checked allCompleted
+            , onClick (CheckAll (not allCompleted))
+            ]
+            []
+        , label
+            [ for "toggle-all" ]
+            [ text "Mark all as complete" ]
+        , Keyed.ul [ class "todo-list" ] <|
+            List.map viewKeyedEntry (List.filter isVisible entries)
+        ]
+
+
+
+--VIEW INDIVIDUAL ENTRIES
+
+
+viewKeyedEntry : Entry -> ( String, Html Msg )
+viewKeyedEntry todo =
+    ( String.fromInt todo.id, viewEntry todo )
+
+
+viewEntry : Entry -> Html Msg
+viewEntry todo =
+    li
+        [ classList [ ( "completed", todo.completed ), ( "editing", todo.editing ) ] ]
+        [ div
+            [ class "view" ]
+            [ input
+                [ class "toggle"
+                , type_ "checkbox"
+                , checked todo.completed
+                , onClick (Check todo.id (not todo.completed))
+                ]
+                []
+            , label
+                []
+                [ text todo.description ]
+            , button
+                [ class "destroy"
+                , onClick NoOp
+                ]
+                []
+            ]
+        , input
+            [ class "edit"
+            , value todo.description
+            , name "title"
+            , id ("todo-" ++ String.fromInt todo.id)
+
+            --, onInput (UpdateEntry todo.id)
+            --, onBlur (EditingEntry todo.id False)
+            --, onEnter (EditingEntry todo.id False)
+            ]
+            []
+        ]
+
+
+
+--VIEW CONTROLS
 
 
 viewControls : String -> List Entry -> Html Msg
 viewControls visibility entries =
+    let
+        entriesCompleted =
+            List.length (List.filter .completed entries)
+
+        entriesLeft =
+            List.length entries - entriesCompleted
+    in
     footer
         [ class "footer"
         , hidden (List.isEmpty entries)
         ]
-        [ text (String.fromInt (List.length entries)) ]
+        [ viewControlsCount entriesLeft
+        , viewControlsFilters visibility
+        , viewControlsClear entriesCompleted
+        ]
+
+
+viewControlsCount : Int -> Html Msg
+viewControlsCount total =
+    text (String.fromInt total)
+
+
+viewControlsFilters : String -> Html Msg
+viewControlsFilters visibility =
+    ul
+        [ class "filters" ]
+        [ visibilitySwap "#/all" "All" visibility
+        , text " "
+        , visibilitySwap "#/active" "Active" visibility
+        , text " "
+        , visibilitySwap "#/completed" "Completed" visibility
+        ]
+
+
+visibilitySwap : String -> String -> String -> Html Msg
+visibilitySwap uri visibility actualVisibility =
+    li
+        [ onClick (ChangeVisibility visibility) ]
+        [ a [ href uri, classList [ ( "selected", visibility == actualVisibility ) ] ]
+            [ text visibility ]
+        ]
+
+
+viewControlsClear : Int -> Html Msg
+viewControlsClear entriesCompleted =
+    button
+        [ class "clear-completed"
+        , hidden (entriesCompleted == 0)
+
+        --, onClick DeleteComplete
+        ]
+        [ text ("Clear completed (" ++ String.fromInt entriesCompleted ++ ")")
+        ]
+
+
+infoFooter : Html msg
+infoFooter =
+    footer [ class "info" ]
+        [ p [] [ text "Double-click to edit a todo" ]
+        , p []
+            [ text "Written by "
+            , a [ href "https://github.com/evancz" ] [ text "Evan Czaplicki" ]
+            ]
+        , p []
+            [ text "Part of "
+            , a [ href "http://todomvc.com" ] [ text "TodoMVC" ]
+            ]
+        ]
