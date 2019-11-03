@@ -90,6 +90,8 @@ type Msg
     | Add
     | Check Int Bool
     | CheckAll Bool
+    | Delete Int
+    | DeleteComplete
     | UpdateField String
     | ChangeVisibility String
 
@@ -114,6 +116,11 @@ update msg model =
             , Cmd.none
             )
 
+        UpdateField field ->
+            ( { model | field = field }
+            , Cmd.none
+            )
+
         Check id checked ->
             let
                 updateEntry t =
@@ -127,11 +134,22 @@ update msg model =
             , Cmd.none
             )
 
-        CheckAll state ->
-            ( model, Cmd.none )
+        CheckAll isCompleted ->
+            let
+                updateEntry t =
+                    { t | completed = isCompleted }
+            in
+            ( { model | entries = List.map updateEntry model.entries }
+            , Cmd.none
+            )
 
-        UpdateField field ->
-            ( { model | field = field }
+        Delete id ->
+            ( { model | entries = List.filter (\t -> t.id /= id) model.entries }
+            , Cmd.none
+            )
+
+        DeleteComplete ->
+            ( { model | entries = List.filter (\t -> t.completed == False) model.entries }
             , Cmd.none
             )
 
@@ -338,8 +356,7 @@ viewControlsClear entriesCompleted =
     button
         [ class "clear-completed"
         , hidden (entriesCompleted == 0)
-
-        --, onClick DeleteComplete
+        , onClick DeleteComplete
         ]
         [ text ("Clear completed (" ++ String.fromInt entriesCompleted ++ ")")
         ]
