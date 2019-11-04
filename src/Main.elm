@@ -1,11 +1,13 @@
 port module Main exposing (..)
 
 import Browser
+import Browser.Dom as Dom
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (keyCode, on, onClick, onInput)
+import Html.Events exposing (keyCode, on, onBlur, onClick, onDoubleClick, onInput)
 import Html.Keyed as Keyed
 import Json.Decode as Json
+import Task
 
 
 
@@ -88,11 +90,13 @@ init maybeModel =
 type Msg
     = NoOp
     | Add
+    | UpdateField String
+    | EditingEntry Int Bool
+    | UpdateEntry Int String
     | Check Int Bool
     | CheckAll Bool
     | Delete Int
     | DeleteComplete
-    | UpdateField String
     | ChangeVisibility String
 
 
@@ -118,6 +122,35 @@ update msg model =
 
         UpdateField field ->
             ( { model | field = field }
+            , Cmd.none
+            )
+
+        EditingEntry id isEditing ->
+            let
+                updateEntry t =
+                    if t.id == id then
+                        { t | editing = isEditing }
+
+                    else
+                        t
+
+                focus =
+                    Dom.focus ("todo-" ++ String.fromInt id)
+            in
+            ( { model | entries = List.map updateEntry model.entries }
+            , Task.attempt (\_ -> NoOp) focus
+            )
+
+        UpdateEntry id task ->
+            let
+                updateEntry t =
+                    if t.id == id then
+                        { t | description = task }
+
+                    else
+                        t
+            in
+            ( { model | entries = List.map updateEntry model.entries }
             , Cmd.none
             )
 
@@ -245,6 +278,7 @@ viewEntries visibility entries =
         [ input
             [ class "toggle-all"
             , type_ "checkbox"
+            , name "toggle"
             , checked allCompleted
             , onClick (CheckAll (not allCompleted))
             ]
@@ -280,11 +314,11 @@ viewEntry todo =
                 ]
                 []
             , label
-                []
+                [ onDoubleClick (EditingEntry todo.id True) ]
                 [ text todo.description ]
             , button
                 [ class "destroy"
-                , onClick NoOp
+                , onClick (Delete todo.id)
                 ]
                 []
             ]
@@ -293,10 +327,9 @@ viewEntry todo =
             , value todo.description
             , name "title"
             , id ("todo-" ++ String.fromInt todo.id)
-
-            --, onInput (UpdateEntry todo.id)
-            --, onBlur (EditingEntry todo.id False)
-            --, onEnter (EditingEntry todo.id False)
+            , onInput (UpdateEntry todo.id)
+            , onBlur (EditingEntry todo.id False)
+            , onEnter (EditingEntry todo.id False)
             ]
             []
         ]
@@ -326,8 +359,20 @@ viewControls visibility entries =
 
 
 viewControlsCount : Int -> Html Msg
-viewControlsCount total =
-    text (String.fromInt total)
+viewControlsCount entriesLeft =
+    let
+        item_ =
+            if entriesLeft == 1 then
+                " item"
+
+            else
+                " items"
+    in
+    span
+        [ class "todo-count" ]
+        [ strong [] [ text (String.fromInt entriesLeft) ]
+        , text (item_ ++ " left")
+        ]
 
 
 viewControlsFilters : String -> Html Msg
