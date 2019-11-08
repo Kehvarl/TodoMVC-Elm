@@ -216,7 +216,7 @@ viewInput : String -> Html Msg
 viewInput task =
     header
         [ class "header" ]
-        [ h1 [] [ text "todos" ]
+        [ h1 [] [ text "To-Dos" ]
         , input
             [ class "new-todo"
             , placeholder "What needs to be done?"
